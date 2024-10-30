@@ -28,6 +28,15 @@ def on_click(message):
         bot.send_message(message.chat.id, "Edit photo")
 
 
+@bot.message_handler(commands=['send_photo'])
+def send_photo(message):
+    file = open('./photo.jpg', 'rb')
+    bot.send_photo(message.chat.id, file)
+    # bot.send_audio(message.chat.id, file)
+    # bot.send_video(message.chat.id, file)
+
+
+
 @bot.message_handler(content_types=["photo"])
 def get_photo(message):
     markup = types.InlineKeyboardMarkup()
