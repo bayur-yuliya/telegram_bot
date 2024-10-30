@@ -1,10 +1,12 @@
 import telebot
 from telebot import types
 import webbrowser
+import sqlite3
 
 from config import TOKEN
 
 bot = telebot.TeleBot(TOKEN)
+name = None
 
 
 @bot.message_handler(commands=["start"])
@@ -28,13 +30,76 @@ def on_click(message):
         bot.send_message(message.chat.id, "Edit photo")
 
 
-@bot.message_handler(commands=['send_photo'])
+@bot.message_handler(commands=["send_photo"])
 def send_photo(message):
-    file = open('./photo.jpg', 'rb')
+    file = open("./photo.jpg", "rb")
     bot.send_photo(message.chat.id, file)
-    # bot.send_audio(message.chat.id, file)
-    # bot.send_video(message.chat.id, file)
 
+
+@bot.message_handler(commands=["db"])
+def db(message):
+    conn = sqlite3.connect("telebot.sql")
+    cur = conn.cursor()
+
+    cur.execute(
+        "CREATE TABLE IF NOT EXISTS users (id int auto_increment primary key, name varchar(50), password varchar(50))"
+    )
+    conn.commit()
+
+    cur.close()
+    conn.close()
+
+    bot.send_message(
+        message.chat.id, "Привет, сейчас зарегистрируем данные. Введите имя: "
+    )
+    bot.register_next_step_handler(message, user_name)
+
+
+def user_name(message):
+    global name
+    name = message.text.strip()
+    bot.send_message(message.chat.id, "Введите пароль: ")
+    bot.register_next_step_handler(message, user_password)
+
+
+def user_password(message):
+    password = message.text.strip()
+    conn = sqlite3.connect("telebot.sql")
+    cur = conn.cursor()
+
+    cur.execute(
+        'INSERT INTO users (name, password) VALUES ("%s", "%s")' % (name, password)
+    )
+    conn.commit()
+
+    cur.close()
+    conn.close()
+
+    markup = types.InlineKeyboardMarkup()
+    markup.add(
+        types.InlineKeyboardButton("Список пользователей", callback_data="user_list")
+    )
+
+    bot.send_message(
+        message.chat.id, "Пользователь зарегистрирован", reply_markup=markup
+    )
+
+
+@bot.callback_query_handler(func=lambda callback: True)
+def user_list(callback):
+    conn = sqlite3.connect("telebot.sql")
+    cur = conn.cursor()
+
+    cur.execute("SELECT * FROM users")
+    users = cur.fetchall()
+    info = ""
+    for user in users:
+        info += f"Имя: {user[1]}, пароль: {user[2]}\n"
+
+    cur.close()
+    conn.close()
+
+    bot.send_message(callback.message.chat.id, info)
 
 
 @bot.message_handler(content_types=["photo"])
@@ -76,11 +141,6 @@ def info_user(message):
 @bot.message_handler(commands=["site", "website"])
 def site(message):
     webbrowser.open("https://translate.google.com/?sl=en&tl=ru&op=translate")
-
-
-@bot.message_handler(commands=["user_name"])
-def user_name(message):
-    bot.send_message(message.chat.id, f"Привет, {message.from_user.first_name}")
 
 
 @bot.message_handler()

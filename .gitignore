@@ -163,3 +163,4 @@ config.py
 venv/
 
 photo.jpg
+telebot.sql
