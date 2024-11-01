@@ -161,6 +161,6 @@ cython_debug/
 
 config.py
 venv/
+img/
 
-photo.jpg
 telebot.sql
