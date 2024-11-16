@@ -1,7 +1,7 @@
 import asyncio
 import logging
 
-from aiogram import Bot, Dispatcher, types
+from aiogram import Router, Bot, Dispatcher, types, F
 from aiogram.client.default import DefaultBotProperties
 from aiogram.filters import Command
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -13,16 +13,32 @@ from config import TOKEN
 bot = Bot(token=TOKEN, default=DefaultBotProperties(parse_mode='HTML'))
 dp = Dispatcher()
 currency = CurrencyConverter()
+router = Router()
+dp.include_router(router)
 
 amount = 0
 
 
-@dp.message(Command("start"))
+@router.message(Command("start"))
 async def start(message: types.Message):
     await message.answer('Привет! Введите сумму для конвертации:')
 
 
-@dp.message()
+@router.message(F.text.regexp(r"^[A-Za-z]{3}/[A-Za-z]{3}$"))
+async def get_custom_currency(message: types.Message):
+    if amount <= 0:
+        return
+
+    try:
+        base, target = message.text.upper().split('/')
+        if base not in currency.currencies or target not in currency.currencies:
+            raise ValueError("Unsupported currency")
+        await convert_currency(message, base, target, amount)
+    except ValueError:
+        await message.answer('Неправильный формат или неподдерживаемая валюта. Попробуйте еще раз:')
+
+
+@router.message()
 async def get_amount(message: types.Message):
 
     try:
@@ -39,24 +55,27 @@ async def get_amount(message: types.Message):
     markup = InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text='USD/EUR', callback_data='usd/eur'),
-        ],
-        [
             InlineKeyboardButton(text='EUR/USD', callback_data='eur/usd'),
         ],
         [
             InlineKeyboardButton(text='EUR/GBP', callback_data='eur/gbp'),
+            InlineKeyboardButton(text='Другая пара валют', callback_data='else')
         ]
     ])
+
     await message.answer('Выберите конвертацию или введите свою пару:', reply_markup=markup)
 
 
-@dp.callback_query()
+@router.callback_query()
 async def handle_conversion(call: types.CallbackQuery):
     if amount <= 0:
         return
 
-    base, target = call.data.upper().split('/')
-    await convert_currency(call.message, base, target, amount)
+    if call.data != 'else':
+        base, target = call.data.upper().split('/')
+        await convert_currency(call.message, base, target, amount)
+    else:
+        await call.message.answer('Введите пару валюты в формате XXX/YYY:')
 
 
 async def convert_currency(message: types.Message, base: str, target: str, amount):
