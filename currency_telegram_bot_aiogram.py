@@ -89,7 +89,6 @@ async def convert_currency(message: types.Message, base: str, target: str, amoun
 
 
 async def main():
-    logging.basicConfig(level=logging.INFO)
     await dp.start_polling(bot)
 
 
